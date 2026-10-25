@@ -1,0 +1,35 @@
+name: Experiment checks
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  numerical-checks:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.9', '3.12', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: python -m unittest -v
+      - run: python train.py --out /tmp/shortcut-report
+      - name: Verify checked-in measurements reproduce
+        run: |
+          python - <<'PY'
+          import json, math, pathlib
+          expected = json.loads(pathlib.Path('results.json').read_text())
+          actual = json.loads(pathlib.Path('/tmp/shortcut-report/results.json').read_text())
+          def compare(a, b):
+              if isinstance(a, dict):
+                  assert a.keys() == b.keys()
+                  for key in a: compare(a[key], b[key])
+              elif isinstance(a, list):
+                  assert len(a) == len(b)
+                  for x, y in zip(a, b): compare(x, y)
+              elif isinstance(a, float):
+                  assert math.isclose(a, b, rel_tol=1e-10, abs_tol=1e-12), (a, b)
+              else: assert a == b, (a, b)
+          compare(expected, actual)
+          PY
