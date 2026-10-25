@@ -1,0 +1,5 @@
+__pycache__/
+my-report/
+report/
+.DS_Store
+.venv/
